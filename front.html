@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket News Feed</title>
+    <style>
+
+        #newsFeed {
+            max-width: 640px; /* Максимальная ширина ленты новостей */
+            width: 100%; /* Ширина 100% от родительского элемента */
+        }
+
+        .weather {
+            border: 1px solid #9a9797;
+            padding: 10px;
+            border-radius: 15px;
+            width: 300px; /* Ширина блока погоды */
+            background-color: white; /* Фон блока погоды */
+            margin-left: 20px; /* Отступ слева для разделения с лентой новостей */
+        }
+
+        body {
+            display: flex;
+            flex-direction: column; /* Вертикальное расположение элементов */
+            align-items: center; /* Центрируем содержимое по горизонтали */
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #cacaca; /* Нейтральный фон для всей страницы */
+        }
+
+        .news-item {
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            width: 100%; /* Ширина 100% от родительского элемента */
+            max-width: 700px; /* Увеличенная максимальная ширина рамки */
+        }
+
+        .vk {
+            border-radius: 20px;
+            border-color: #4B88E1; /* Цвет рамки для VK */
+            background-color: #E8F0FE; /* Фоновый цвет для VK */
+        }
+
+        .tg {
+            border-radius: 20px;
+            border-color: #0088CC; /* Цвет рамки для Telegram */
+            background-color: #E0F7FA; /* Фоновый цвет для Telegram */
+        }
+
+        img {
+            max-width: 100%;
+            height: auto;
+        }
+
+        .icon {
+            width: 20px;
+            height: 20px;
+        }
+
+        .timestamp {
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        body.light {
+            background-color: #ffffff;
+            color: #000000;
+        }
+
+        body.dark {
+            background-color: #333333;
+            color: #000000;
+        }
+
+        .media-container {
+            overflow-x: auto; /* Добавляем горизонтальный скролл для медиа */
+            white-space: nowrap; /* Запрещаем перенос строк внутри контейнера */
+        }
+
+        .vertical-photo {
+            padding: 0 15px; /* Серые вставки по бокам */
+            background-color: #f0f0f0; /* Цвет вставок */
+        }
+
+        .news-item.expanded .text-content {
+            max-height: none; /* Разворачиваем текст */
+        }
+
+        .news-item .text-content {
+            max-height: 100px; /* Ограничиваем высоту текста */
+            overflow: hidden; /* Скрываем переполнение */
+            transition: max-height 0.3s ease; /* Плавный переход */
+        }
+    </style>
+</head>
+<body class="light">
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+
+<!-- Блок погоды -->
+<div class="weather">
+    <h2>Погода</h2>
+    <div id="weatherInfo">
+        <p id="weatherCity">Город: Казань</p>
+        <p id="weatherTemp">Температура: --°C</p>
+        <p id="weatherDesc">Описание: --</p>
+        <img id="weatherIcon" src="" alt="Погода" style="display:none;"/>
+    </div>
+</div>
+
+<div style="display: flex; justify-content: space-between; align-items: center;">
+    <h1>Лента новостей</h1>
+</div>
+
+<div id="newsFeed"></div>
+
+<button id="getMoreMessages">Получить ещё</button>
+
+<script>
+    const socket = new WebSocket('http://mytestdomain.ddns.net:49500/ws'); // Замените на ваш адрес WebSocket
+
+    socket.onopen = function (event) {
+        console.log('Подключение к WebSocket установлено.');
+    };
+
+    socket.onmessage = function (event) {
+        console.log('Получено сообщение:', event.data);
+        try {
+            const message = JSON.parse(event.data);
+
+            if (Array.isArray(message)) {
+                displayMessages(message);
+            } else {
+                displaySingleMessage(message);
+            }
+        } catch (error) {
+            console.error('Ошибка при парсинге сообщения:', error);
+        }
+    };
+
+    socket.onerror = function (error) {
+        console.error('Ошибка WebSocket:', error);
+    };
+
+    socket.onclose = function (event) {
+        console.log('Подключение к WebSocket закрыто.', event);
+    };
+
+    document.getElementById('getMoreMessages').onclick = function () {
+        console.log('Запрос на получение дополнительных сообщений отправлен.');
+        socket.send(JSON.stringify({action: 'getMsg'}));
+    };
+
+    function displaySingleMessage(message) {
+        const newsFeed = document.getElementById('newsFeed');
+
+        const newsItem = document.createElement('div');
+        newsItem.className = 'news-item ' + (message.type === 'tg' ? 'tg' : 'vk');
+
+        const titleContainer = document.createElement('div');
+
+        const icon = document.createElement('i');
+        icon.className = message.type === 'tg' ? 'fab fa-telegram-plane' : 'fab fa-vk';
+        icon.style.marginRight = '10px';
+
+        titleContainer.appendChild(icon);
+
+        const title = document.createElement('h3');
+        title.textContent = message.group_name || "Без названия";
+
+        titleContainer.appendChild(title);
+
+        newsItem.appendChild(titleContainer);
+
+        const textContainer = document.createElement('div');
+        textContainer.className = 'text-content';
+        const text = document.createElement('p');
+        text.innerHTML = message.text.replace(/\n/g, '<br>');
+
+        textContainer.appendChild(text);
+
+        if (message.text.length > 600) {
+            const toggleTextButton = document.createElement('button');
+            toggleTextButton.textContent = 'Развернуть';
+
+            toggleTextButton.onclick = function () {
+                if (newsItem.classList.toggle('expanded')) {
+                    toggleTextButton.textContent = 'Свернуть';
+                } else {
+                    toggleTextButton.textContent = 'Развернуть';
+                }
+                textContainer.style.maxHeight = newsItem.classList.contains('expanded') ? 'none' : '100px';
+                textContainer.style.overflow = newsItem.classList.contains('expanded') ? 'visible' : 'hidden';
+                console.log(`Текст сообщения развернут/свернут.`);
+            };
+
+            newsItem.appendChild(textContainer);
+            newsItem.appendChild(toggleTextButton);
+        } else {
+            textContainer.style.maxHeight = 'none';
+            textContainer.style.overflow = 'visible';
+            newsItem.appendChild(textContainer);
+        }
+
+        const timestamp = document.createElement('p');
+        timestamp.className = 'timestamp';
+        timestamp.textContent = new Date(message.created_at).toLocaleString();
+        newsItem.appendChild(timestamp);
+
+        if (message.metadata && message.metadata.length > 0) {
+            const mediaContainer = document.createElement('div');
+            mediaContainer.className = 'media-container';
+
+            message.metadata.forEach(meta => {
+                let content;
+
+                switch (meta.type) {
+                    case 'Photo':
+                        content = document.createElement('img');
+                        content.src = meta.url;
+                        if (meta.url.endsWith('.jpg') || meta.url.endsWith('.png')) {
+                            content.className = 'vertical-photo';
+                        }
+                        break;
+                    case 'Video':
+                        content = document.createElement('video');
+                        content.controls = true;
+                        content.style.width = '100%';
+                        const sourceVideo = document.createElement('source');
+                        sourceVideo.src = meta.url;
+                        sourceVideo.type = 'video/mp4';
+                        content.appendChild(sourceVideo);
+                        break;
+                    case 'Audio':
+                        content = document.createElement('audio');
+                        content.controls = true;
+                        const audioSource = document.createElement('source');
+                        audioSource.src = meta.url;
+                        audioSource.type = 'audio/mpeg';
+                        content.appendChild(audioSource);
+                        break;
+                    case 'Document':
+                        content = document.createElement('a');
+                        content.href = meta.url;
+                        content.textContent = 'Документ';
+                        content.target = '_blank';
+                        const docIcon = document.createElement('img');
+                        docIcon.src = 'http://mytestdomain.ddns.net:9000/icons/documentation.png';
+                        docIcon.className = 'icon';
+                        content.prepend(docIcon);
+                        break;
+                    case 'Iframe':
+                        content = document.createElement('iframe');
+                        content.src = meta.url;
+                        content.width = '640';
+                        content.height = '360';
+                        content.frameBorder = '0';
+                        content.allow = "autoplay; encrypted-media; fullscreen; picture-in-picture; screen-wake-lock;";
+                        content.allowFullscreen = true;
+                        break;
+                    default:
+                        console.warn(`Неизвестный тип метаданных: ${meta.type}`);
+                        content = document.createTextNode('Неизвестный тип');
+                }
+
+                mediaContainer.appendChild(content);
+            });
+
+            newsItem.appendChild(mediaContainer);
+        }
+
+        if (message.new) {
+            newsFeed.insertBefore(newsItem, newsFeed.firstChild);
+        } else {
+            newsFeed.appendChild(newsItem);
+        }
+
+        console.log(`Сообщение добавлено в ленту новостей.`);
+    }
+
+    function displayMessages(messages) {
+        const newsFeed = document.getElementById('newsFeed');
+
+        messages.forEach((message, index) => {
+            const newsItem = document.createElement('div');
+            newsItem.className = 'news-item ' + (message.type === 'tg' ? 'tg' : 'vk');
+
+            const titleContainer = document.createElement('div');
+
+            const icon = document.createElement('i');
+            icon.className = message.type === 'tg' ? 'fab fa-telegram-plane' : 'fab fa-vk';
+            icon.style.marginRight = '10px';
+
+            titleContainer.appendChild(icon);
+
+            const title = document.createElement('h3');
+            title.textContent = message.group_name || "Без названия";
+
+            titleContainer.appendChild(title);
+
+            newsItem.appendChild(titleContainer);
+
+            const textContainer = document.createElement('div');
+            textContainer.className = 'text-content';
+            const text = document.createElement('p');
+            text.innerHTML = message.text.replace(/\n/g, '<br>');
+
+            textContainer.appendChild(text);
+
+            if (message.text.length > 600) {
+                const toggleTextButton = document.createElement('button');
+                toggleTextButton.textContent = 'Развернуть';
+
+                toggleTextButton.onclick = function () {
+                    if (newsItem.classList.toggle('expanded')) {
+                        toggleTextButton.textContent = 'Свернуть';
+                    } else {
+                        toggleTextButton.textContent = 'Развернуть';
+                    }
+                    textContainer.style.maxHeight = newsItem.classList.contains('expanded') ? 'none' : '100px';
+                    textContainer.style.overflow = newsItem.classList.contains('expanded') ? 'visible' : 'hidden';
+                    console.log(`Текст сообщения развернут/свернут.`);
+                };
+
+                newsItem.appendChild(textContainer);
+                newsItem.appendChild(toggleTextButton);
+            } else {
+                textContainer.style.maxHeight = 'none';
+                textContainer.style.overflow = 'visible';
+                newsItem.appendChild(textContainer);
+            }
+
+            const timestamp = document.createElement('p');
+            timestamp.className = 'timestamp';
+            timestamp.textContent = new Date(message.created_at).toLocaleString();
+            newsItem.appendChild(timestamp);
+
+            if (message.metadata && message.metadata.length > 0) {
+                const mediaContainer = document.createElement('div');
+                mediaContainer.className = 'media-container';
+
+                message.metadata.forEach(meta => {
+                    let content;
+
+                    switch (meta.type) {
+                        case 'Photo':
+                            content = document.createElement('img');
+                            content.src = meta.url;
+                            if (meta.url.endsWith('.jpg') || meta.url.endsWith('.png')) {
+                                content.className = 'vertical-photo';
+                            }
+                            break;
+                        case 'Video':
+                            content = document.createElement('video');
+                            content.controls = true;
+                            content.style.width = '100%';
+                            const sourceVideo = document.createElement('source');
+                            sourceVideo.src = meta.url;
+                            sourceVideo.type = 'video/mp4';
+                            content.appendChild(sourceVideo);
+                            break;
+                        case 'Audio':
+                            content = document.createElement('audio');
+                            content.controls = true;
+                            const audioSource = document.createElement('source');
+                            audioSource.src = meta.url;
+                            audioSource.type = 'audio/mpeg';
+                            content.appendChild(audioSource);
+                            break;
+                        case 'Document':
+                            content = document.createElement('a');
+                            content.href = meta.url;
+                            content.textContent = 'Документ';
+                            content.target = '_blank';
+                            const docIcon = document.createElement('img');
+                            docIcon.src = 'http://mytestdomain.ddns.net:9000/icons/documentation.png';
+                            docIcon.className = 'icon';
+                            content.prepend(docIcon);
+                            break;
+                        case 'Iframe':
+                            content = document.createElement('iframe');
+                            content.src = meta.url;
+                            content.width = '640';
+                            content.height = '360';
+                            content.frameBorder = '0';
+                            content.allow = "autoplay; encrypted-media; fullscreen; picture-in-picture; screen-wake-lock;";
+                            content.allowFullscreen = true;
+                            break;
+                        default:
+                            console.warn(`Неизвестный тип метаданных: ${meta.type}`);
+                            content = document.createTextNode('Неизвестный тип');
+                    }
+
+                    mediaContainer.appendChild(content);
+                });
+
+                newsItem.appendChild(mediaContainer);
+            } else {
+                const noMetaText = document.createTextNode(' ');
+                newsItem.appendChild(noMetaText);
+            }
+
+            if (message.new) {
+                newsFeed.insertBefore(newsItem, newsFeed.firstChild);
+            } else {
+                newsFeed.appendChild(newsItem);
+            }
+
+            console.log(`Сообщение ${index + 1} добавлено в ленту новостей.`);
+        });
+    }
+
+    function getWeather() {
+        const apiKey = "02066fbb963a4eadaa4191911252801";
+        const city = "Kazan"; // Город Казань
+        fetch(`https://api.weatherapi.com/v1/current.json?key=${apiKey}&q=${city}&lang=ru`)
+            .then(response => response.json())
+            .then(data => displayWeather(data))
+            .catch(error => console.error("Ошибка получения данных о погоде:", error));
+    }
+
+    function displayWeather(data) {
+        if (!data || data.error) {
+            alert("Город не найден.");
+            return;
+        }
+
+        document.getElementById("weatherCity").textContent = `Город: ${data.location.name}`;
+        document.getElementById("weatherTemp").textContent = `Температура: ${data.current.temp_c}°C`;
+        document.getElementById("weatherDesc").textContent = `Описание: ${data.current.condition.text}`;
+
+        const weatherIconUrl = data.current.condition.icon;
+        const weatherIcon = document.getElementById("weatherIcon");
+        weatherIcon.src = weatherIconUrl;
+        weatherIcon.style.display = 'block';
+    }
+    getWeather()
+
+</script>
+
+</body>
+</html>

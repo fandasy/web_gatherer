@@ -1,0 +1,3 @@
+DROP INDEX IF EXISTS tg_channel_idx CASCADE;
+
+DROP TABLE IF EXISTS tg_channels CASCADE;

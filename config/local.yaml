@@ -1,0 +1,38 @@
+telegram:
+  token: ":"
+  update_timeout: 60
+  api_id: ""
+  api_hash: ""
+
+web_server:
+  addr: "0.0.0.0:49500"
+  read_timeout: 60s
+  write_timeout: 60s
+
+vk_api:
+  token: ""
+
+slog:
+  env: "dev"
+  output: "console"
+
+migrations_path: "file://migrations"
+
+storage:
+  DB_HOST: "localhost"
+  DB_PORT: 5432
+  DB_NAME: "testdb"
+  DB_USER: "username"
+  DB_PASSWORD: "password"
+
+file_storage:
+  external_addr: "http://example.ddns.net:9000"
+  local_addr: "localhost:9000"
+  key_id: ""
+  secret_key: ""
+
+redis:
+  addr: "localhost:6379"
+  password: ""
+  DB: 1
+  restore_timeout: 15s
