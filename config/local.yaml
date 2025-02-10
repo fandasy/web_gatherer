@@ -26,10 +26,10 @@ storage:
   DB_PASSWORD: "password"
 
 file_storage:
-  external_addr: "http://example.ddns.net:9000"
+  external_addr: "http://localhost:9000"
   local_addr: "localhost:9000"
-  key_id: ""
-  secret_key: ""
+  key_id: "minioadmin"
+  secret_key: "minioadmin"
 
 redis:
   addr: "localhost:6379"

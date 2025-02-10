@@ -1,0 +1,77 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:latest
+    environment:
+      POSTGRES_USER: username
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: testdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:latest
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  minio:
+    image: minio/minio:latest
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"  # MinIO console
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+
+  minio-setup:
+    image: minio/mc:latest
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      until (/usr/bin/mc alias set myminio http://minio:9000 minioadmin minioadmin); do echo 'Waiting for MinIO to start...'; sleep 1; done;
+      /usr/bin/mc mb myminio/animations;
+      /usr/bin/mc mb myminio/audios;
+      /usr/bin/mc mb myminio/documents;
+      /usr/bin/mc mb myminio/icons;
+      /usr/bin/mc mb myminio/music;
+      /usr/bin/mc mb myminio/photos;
+      /usr/bin/mc mb myminio/videos;
+      /usr/bin/mc policy set download myminio/animations;
+      /usr/bin/mc policy set download myminio/audios;
+      /usr/bin/mc policy set download myminio/documents;
+      /usr/bin/mc policy set download myminio/icons;
+      /usr/bin/mc policy set download myminio/music;
+      /usr/bin/mc policy set download myminio/photos;
+      /usr/bin/mc policy set download myminio/videos;
+      echo 'MinIO setup complete!';
+      "
+    networks:
+      - default
+
+  app:
+    build: .
+    environment:
+      CONFIG_PATH: /app/config/local.yaml
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+      - redis
+      - minio
+    volumes:
+      - ./config/local.yaml:/app/config/local.yaml
+      - ./migrations:/app/migrations
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
