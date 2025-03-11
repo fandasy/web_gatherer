@@ -2,76 +2,90 @@ version: '3.8'
 
 services:
   postgres:
-    image: postgres:latest
+    image: postgres:14
+    container_name: postgres
     environment:
-      POSTGRES_USER: username
+      POSTGRES_USER: user
       POSTGRES_PASSWORD: password
-      POSTGRES_DB: testdb
+      POSTGRES_DB: mydb
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U user -d mydb" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   redis:
-    image: redis:latest
+    image: redis:7
+    container_name: redis
     ports:
       - "6379:6379"
-    volumes:
-      - redis_data:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   minio:
     image: minio/minio:latest
+    container_name: minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
-    ports:
-      - "9000:9000"
-      - "9001:9001"  # MinIO console
-    volumes:
-      - minio_data:/data
-    command: server /data --console-address ":9001"
+    command: server /data --address ":9000" --console-address ":9001"
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   minio-setup:
     image: minio/mc:latest
+    container_name: minio-setup
     depends_on:
-      - minio
+      minio:
+        condition: service_healthy
     entrypoint: >
       /bin/sh -c "
-      until (/usr/bin/mc alias set myminio http://minio:9000 minioadmin minioadmin); do echo 'Waiting for MinIO to start...'; sleep 1; done;
-      /usr/bin/mc mb myminio/animations;
-      /usr/bin/mc mb myminio/audios;
-      /usr/bin/mc mb myminio/documents;
-      /usr/bin/mc mb myminio/icons;
-      /usr/bin/mc mb myminio/music;
-      /usr/bin/mc mb myminio/photos;
-      /usr/bin/mc mb myminio/videos;
-      /usr/bin/mc policy set download myminio/animations;
-      /usr/bin/mc policy set download myminio/audios;
-      /usr/bin/mc policy set download myminio/documents;
-      /usr/bin/mc policy set download myminio/icons;
-      /usr/bin/mc policy set download myminio/music;
-      /usr/bin/mc policy set download myminio/photos;
-      /usr/bin/mc policy set download myminio/videos;
-      echo 'MinIO setup complete!';
+      until (/usr/bin/mc alias set myminio http://minio:9000 minioadmin minioadmin) do echo 'Waiting for MinIO...'; sleep 1; done &&
+      if ! (/usr/bin/mc ls myminio/media > /dev/null 2>&1); then
+        /usr/bin/mc mb myminio/media &&
+        /usr/bin/mc anonymous set download myminio/media &&
+        echo 'MinIO bucket created and set to public';
+      else
+        /usr/bin/mc anonymous set download myminio/media &&
+        echo 'Bucket already exists, updated policy to public';
+      fi
       "
     networks:
       - default
 
   app:
-    build: .
-    environment:
-      CONFIG_PATH: /app/config/local.yaml
-    ports:
-      - "8080:8080"
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: app
     depends_on:
-      - postgres
-      - redis
-      - minio
-    volumes:
-      - ./config/local.yaml:/app/config/local.yaml
-      - ./migrations:/app/migrations
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio-setup:
+        condition: service_started
+    ports:
+      - "8082:8082"
 
 volumes:
   postgres_data:
   redis_data:
   minio_data:
+
+networks:
+  default:
+    driver: bridge

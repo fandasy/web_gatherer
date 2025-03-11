@@ -1,15 +1,15 @@
 telegram:
-  host: ""
-  token: ":"
+  host: "api.telegram.org"
+  token: ":" # Ваш бот токен
   update_timeout: 60
 
 web_server:
-  addr: "0.0.0.0:49500"
+  addr: "0.0.0.0:8082"
   read_timeout: 60s
   write_timeout: 60s
 
 vk_api:
-  token: ""
+  token: ""  # Ваш vk api серверный ключ
 
 slog:
   env: "dev"
@@ -20,12 +20,12 @@ migrations_path: "file://migrations"
 storage:
   DB_HOST: "localhost"
   DB_PORT: 5432
-  DB_NAME: "testdb"
-  DB_USER: "username"
+  DB_NAME: "mydb"
+  DB_USER: "user"
   DB_PASSWORD: "password"
 
 file_storage:
-  addr: ""
+  addr: "192.168.0.102:9000"  # Замените на свой ip host
   key_id: "minioadmin"
   secret_key: "minioadmin"
 

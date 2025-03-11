@@ -5,19 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WebSocket News Feed</title>
     <style>
-
         #newsFeed {
             max-width: 640px; /* Максимальная ширина ленты новостей */
             width: 100%; /* Ширина 100% от родительского элемента */
-        }
-
-        .weather {
-            border: 1px solid #9a9797;
-            padding: 10px;
-            border-radius: 15px;
-            width: 300px; /* Ширина блока погоды */
-            background-color: white; /* Фон блока погоды */
-            margin-left: 20px; /* Отступ слева для разделения с лентой новостей */
         }
 
         body {
@@ -100,17 +90,6 @@
 
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 
-<!-- Блок погоды -->
-<div class="weather">
-    <h2>Погода</h2>
-    <div id="weatherInfo">
-        <p id="weatherCity">Город: Казань</p>
-        <p id="weatherTemp">Температура: --°C</p>
-        <p id="weatherDesc">Описание: --</p>
-        <img id="weatherIcon" src="" alt="Погода" style="display:none;"/>
-    </div>
-</div>
-
 <div style="display: flex; justify-content: space-between; align-items: center;">
     <h1>Лента новостей</h1>
 </div>
@@ -120,7 +99,7 @@
 <button id="getMoreMessages">Получить ещё</button>
 
 <script>
-    const socket = new WebSocket('http://mytestdomain.ddns.net:49500/ws'); // Замените на ваш адрес WebSocket
+    const socket = new WebSocket('http://mytestdomain.ddns.net:8082/ws'); // Замените на ваш адрес http server
 
     socket.onopen = function (event) {
         console.log('Подключение к WebSocket установлено.');
@@ -248,7 +227,6 @@
                         content.textContent = 'Документ';
                         content.target = '_blank';
                         const docIcon = document.createElement('img');
-                        docIcon.src = 'http://mytestdomain.ddns.net:9000/icons/documentation.png';
                         docIcon.className = 'icon';
                         content.prepend(docIcon);
                         break;
@@ -376,7 +354,6 @@
                             content.textContent = 'Документ';
                             content.target = '_blank';
                             const docIcon = document.createElement('img');
-                            docIcon.src = 'http://mytestdomain.ddns.net:9000/icons/documentation.png';
                             docIcon.className = 'icon';
                             content.prepend(docIcon);
                             break;
@@ -412,33 +389,6 @@
             console.log(`Сообщение ${index + 1} добавлено в ленту новостей.`);
         });
     }
-
-    function getWeather() {
-        const apiKey = "02066fbb963a4eadaa4191911252801";
-        const city = "Kazan"; // Город Казань
-        fetch(`https://api.weatherapi.com/v1/current.json?key=${apiKey}&q=${city}&lang=ru`)
-            .then(response => response.json())
-            .then(data => displayWeather(data))
-            .catch(error => console.error("Ошибка получения данных о погоде:", error));
-    }
-
-    function displayWeather(data) {
-        if (!data || data.error) {
-            alert("Город не найден.");
-            return;
-        }
-
-        document.getElementById("weatherCity").textContent = `Город: ${data.location.name}`;
-        document.getElementById("weatherTemp").textContent = `Температура: ${data.current.temp_c}°C`;
-        document.getElementById("weatherDesc").textContent = `Описание: ${data.current.condition.text}`;
-
-        const weatherIconUrl = data.current.condition.icon;
-        const weatherIcon = document.getElementById("weatherIcon");
-        weatherIcon.src = weatherIconUrl;
-        weatherIcon.style.display = 'block';
-    }
-    getWeather()
-
 </script>
 
 </body>
