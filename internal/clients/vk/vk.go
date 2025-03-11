@@ -75,6 +75,7 @@ func (h *Handler) Shutdown(ctx context.Context, domain string) error {
 			return e.Wrap(fn, err)
 		}
 		delete(h.ls.m, domain)
+		close(listener.stop)
 		h.log.Info("[VK GROUP] Listener shutting down", slog.String("domain", domain))
 	default:
 	}
@@ -110,7 +111,7 @@ func (h *Handler) ListenStart(ctx context.Context, vkDomain string) error {
 		return e.Wrap(fn, err)
 	}
 
-	stopCh := make(chan struct{})
+	stopCh := make(chan struct{}, 1)
 
 	listener := &Listener{
 		stopCh,
@@ -130,8 +131,6 @@ func (h *Handler) listen(vkGroup models.VkGroup, stopCh chan struct{}) {
 		slog.String("TgGroup domain", vkGroup.Domain),
 		slog.String("TgGroup name", vkGroup.Name),
 	)
-
-	defer close(stopCh)
 
 	log.Info("[VK GROUP] Listener started")
 
