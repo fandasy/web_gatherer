@@ -8,24 +8,24 @@ import (
 	"project/pkg/e"
 )
 
-func (s *Server) Listener() {
+func (s *Server) Listener(h Handlers) {
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "front.html")
 	})
 
-	http.HandleFunc("/ws", s.handler.WS)
+	http.HandleFunc("/ws", h.newsSender)
 
-	go s.handler.NewsReader()
+	go h.newsReader()
 
-	s.log.Info("[WEB SERVER] started", slog.String("addr", s.web.Addr))
+	s.log.Info("[HTTP SERVER] started", slog.String("addr", s.srv.Addr))
 
-	if err := s.web.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+	if err := s.srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		panic(e.Wrap("failed to start server", err))
 	}
 }
 
 func (s *Server) Shutdown(ctx context.Context) {
-	if err := s.web.Shutdown(ctx); err != nil {
+	if err := s.srv.Shutdown(ctx); err != nil {
 		s.log.Info("failed to shutdown server", slog.String("error", err.Error()))
 	}
 }

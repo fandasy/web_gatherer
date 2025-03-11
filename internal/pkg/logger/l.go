@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math/rand"
 	"os"
 	"project/internal/config"
 	"strings"
@@ -59,6 +60,20 @@ func Setup(cfg *config.Slog) (*slog.Logger, error) {
 	}
 
 	return log, nil
+}
+
+func SetSessionName(log *slog.Logger) *slog.Logger {
+	charset := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	keyLength := 10
+
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+
+	shortKey := make([]byte, keyLength)
+	for i := range shortKey {
+		shortKey[i] = charset[r.Intn(len(charset)-1)]
+	}
+
+	return log.With(slog.String("Session", string(shortKey)))
 }
 
 func createLogFile() (*os.File, error) {

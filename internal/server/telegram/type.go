@@ -1,26 +1,42 @@
 package telegram
 
 import (
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"log/slog"
-	"project/internal/server/telegram/events"
+	"project/internal/clients/tg_bot"
+	"project/internal/server/telegram/channel"
+	"project/internal/server/telegram/chat"
+	"project/internal/server/telegram/group"
 	"sync/atomic"
 )
 
 type Server struct {
-	tg           *tgbotapi.BotAPI
-	p            *events.Processor
+	tg           *tg_bot.Client
+	p            Processor
 	activeEvents atomic.Uint32
 	eventsCount  atomic.Uint64
 	log          *slog.Logger
 }
 
-func NewServer(tg *tgbotapi.BotAPI, p *events.Processor, log *slog.Logger) *Server {
+type Processor struct {
+	chat    *chat.Handler
+	group   *group.Handler
+	channel *channel.Handler
+}
+
+func NewServer(tg *tg_bot.Client, p Processor, log *slog.Logger) *Server {
 	return &Server{
 		tg,
 		p,
 		atomic.Uint32{},
 		atomic.Uint64{},
 		log,
+	}
+}
+
+func NewProcessor(chat *chat.Handler, group *group.Handler, channel *channel.Handler) Processor {
+	return Processor{
+		chat:    chat,
+		group:   group,
+		channel: channel,
 	}
 }

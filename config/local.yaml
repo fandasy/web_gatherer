@@ -1,8 +1,7 @@
 telegram:
+  host: ""
   token: ":"
   update_timeout: 60
-  api_id: ""
-  api_hash: ""
 
 web_server:
   addr: "0.0.0.0:49500"
@@ -26,8 +25,7 @@ storage:
   DB_PASSWORD: "password"
 
 file_storage:
-  external_addr: "http://localhost:9000"
-  local_addr: "localhost:9000"
+  addr: ""
   key_id: "minioadmin"
   secret_key: "minioadmin"
 
@@ -35,4 +33,3 @@ redis:
   addr: "localhost:6379"
   password: ""
   DB: 1
-  restore_timeout: 15s

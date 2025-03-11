@@ -6,9 +6,8 @@ import (
 )
 
 const (
-	RoleIDsMapName     = "RoleIDs"
-	MediaGroupMapName  = "mediaGroupIDs"
-	VkNewsGroupMapName = "vkNewsGroupMap"
+	RoleIDsMapName    = "RoleIDs"
+	MediaGroupMapName = "mediaGroupIDs"
 
 	SubUserRole = "sub user"
 	AdminRole   = "admin"
@@ -18,6 +17,8 @@ const (
 	MsgAudio    = "Audio"
 	MsgDocument = "Document"
 	MsgIframe   = "Iframe"
+
+	MediaBucket = "media"
 )
 
 var (

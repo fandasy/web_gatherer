@@ -8,37 +8,18 @@ import (
 	"os"
 	"os/signal"
 	"project/internal/pkg/logger/sl"
-	"project/internal/server/telegram/events"
 	"strconv"
 	"syscall"
 	"time"
 )
 
-var sessionName string
-
-func init() {
-	charset := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	keyLength := 10
-
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-
-	shortKey := make([]byte, keyLength)
-	for i := range shortKey {
-		shortKey[i] = charset[r.Intn(len(charset)-1)]
-	}
-
-	sessionName = string(shortKey)
-}
-
 func (s *Server) Listener(timeout int) {
-	u := tgbotapi.NewUpdate(0)
-	u.Timeout = timeout
+	cfg := tgbotapi.NewUpdate(0)
+	cfg.Timeout = timeout
 
-	updates := s.tg.GetUpdatesChan(u)
+	updates := s.tg.GetUpdatesChan(cfg)
 
-	s.log.Info("server started", slog.String("session name", sessionName))
-
-	go s.p.PrepareGroupNewsListeners()
+	s.log.Info("Telegram server started")
 
 	for update := range updates {
 		u := update
@@ -120,30 +101,30 @@ func (s *Server) processing(update *tgbotapi.Update) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	id := sessionName + ":" + strconv.FormatUint(s.eventsCount.Add(1), 10)
+	id := strconv.FormatUint(s.eventsCount.Add(1), 10)
 	ctx = context.WithValue(ctx, "ID", id)
 
 	start := time.Now()
 
-	status, err := s.p.TgProcess(ctx, update)
+	status, err := s.p.Process(ctx, update)
 	if err != nil {
 
 		switch status {
-		case events.SKIP:
+		case SKIP:
 			goto logging
 
-		case events.BADREQUEST:
+		case BADREQUEST:
 			s.log.Warn("[BAD REQUEST]", slog.String("ID", id), sl.Err(err))
 			goto logging
 
-		case events.UNKNOWN:
+		case UNKNOWN:
 			goto logging
 
-		case events.TIMEOUT:
+		case TIMEOUT:
 			s.log.Warn("[TIME OUT]", slog.String("ID", id), sl.Err(err))
 			s.sendReplyMsg(update, "timed out")
 
-		case events.RECOVER:
+		case RECOVER:
 			s.log.Error("[EVENT RECOVERED]", slog.String("ID", id), sl.Err(err))
 			return
 
@@ -157,7 +138,6 @@ logging:
 
 	latency := time.Since(start)
 
-	// log
 	username := "Unknown"
 	if fromUser(update) != nil {
 		username = fromUser(update).UserName

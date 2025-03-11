@@ -21,10 +21,9 @@ type Config struct {
 }
 
 type Telegram struct {
+	Host    string `yaml:"host"`
 	Token   string `yaml:"token"`
 	Timeout int    `yaml:"update_timeout"`
-	ApiID   string `yaml:"api_id"`
-	ApiHash string `yaml:"api_hash"`
 }
 
 type WebServer struct {
@@ -51,17 +50,15 @@ type DB struct {
 }
 
 type Files struct {
-	ExternalAddr string `yaml:"external_addr"`
-	LocalAddr    string `yaml:"local_addr"`
-	KeyID        string `yaml:"key_id"`
-	Secret       string `yaml:"secret_key"`
+	Addr   string `yaml:"addr"`
+	KeyID  string `yaml:"key_id"`
+	Secret string `yaml:"secret_key"`
 }
 
 type Redis struct {
-	Addr           string        `yaml:"addr"`
-	Password       string        `yaml:"password"`
-	DB             int           `yaml:"db"`
-	RestoreTimeout time.Duration `yaml:"restore_timeout"`
+	Addr     string `yaml:"addr"`
+	Password string `yaml:"password"`
+	DB       int    `yaml:"db"`
 }
 
 func Load(path string) (*Config, error) {
