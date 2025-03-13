@@ -1,7 +1,7 @@
 telegram:
   admin: "Her72hbf" # Ваш telegram username, писать без @
   host: "api.telegram.org"
-  token: "7285968485:AAG8WT7ENU0Mh8TeKrrb18sJ3axtEMeyjE4" # Ваш бот токен
+  token: "" # Ваш бот токен
   update_timeout: 60
 
 web_server:
@@ -10,7 +10,7 @@ web_server:
   write_timeout: 60s
 
 vk_api:
-  token: "0e00296c0e00296c0e00296c330d21c46f00e000e00296c691b5030ae87785624633ee4"  # Ваш vk api серверный ключ
+  token: ""  # Ваш vk api серверный ключ
 
 slog:
   env: "dev"

@@ -24,6 +24,8 @@ import (
 
 const (
 	groupIdsList = "group_ids"
+
+	msgSuccessfullyInitGroup = `Группа успешна добавлена как новостной источник`
 )
 
 func (h *Handler) GroupCmd(ctx context.Context, update *tgbotapi.Update) error {
@@ -174,6 +176,10 @@ func (h *Handler) initNewGroup(ctx context.Context, msg *tgbotapi.Message) (err 
 		}
 
 		return models.ErrSkipEvent
+	}
+
+	if err := h.sendMsg(msg.Chat.ID, msgSuccessfullyInitGroup); err != nil {
+		return e.Wrap(fn, err)
 	}
 
 	group := models.TgGroup{
@@ -371,127 +377,140 @@ func (h *Handler) handleSaveCaptionMessage(ctx context.Context, msg *tgbotapi.Me
 	}
 
 	if msg.MediaGroupID != "" {
+		return h.handleSaveMediaGroupCaptionMessage(ctx, msg, metaPair, msgText)
+	}
 
-		saveMsgFunc := func() {
-			const fn = "events.saveMsgFunc"
-			resp, _ := h.ac.GetFromMap(models.MediaGroupMapName, msg.MediaGroupID)
+	return h.handleSaveSingleCaptionMessage(ctx, msg, metaPair, msgText)
+}
 
-			readyMsg := resp.(*models.TgGroupMessage)
+func (h *Handler) handleSaveSingleCaptionMessage(ctx context.Context, msg *tgbotapi.Message, metaPair models.TgMetaPair, msgText string) error {
+	const fn = "group.handleSaveSingleCaptionMessage"
 
-			wg := sync.WaitGroup{}
+	metaUrl, err := h.loadMetaByTgID(metaPair.ID, loadMediaFromTgTimeout)
+	if err != nil {
+		return e.Wrap(fn, err)
+	}
 
-			var mu sync.Mutex
-			metaPairs := make([]models.MetaPair, 0, len(readyMsg.MetadataID))
+	message := models.TgGroupMessage{
+		MessageID: msg.MessageID,
+		GroupID:   msg.Chat.ID,
+		Username:  getUsername(msg.From),
+		Text:      msgText,
+		Metadata: []models.MetaPair{{
+			Url:  metaUrl,
+			Type: metaPair.Type,
+		}},
+		CreatedAt: time.Unix(int64(msg.Date), 0),
+	}
 
-			for _, pairID := range readyMsg.MetadataID {
-				wg.Add(1)
+	msgs := []models.TgGroupMessage{message}
 
-				go func() {
-					defer wg.Done()
+	if err := h.db.InsertTgGroupMessages(ctx, msgs); err != nil {
+		return e.Wrap(fn, err)
+	}
 
-					metaUrl, err := h.loadMetaByTgID(pairID.ID, loadMediaFromTgTimeout)
-					if err != nil {
-						h.log.Error(fn, err)
-						return
-					}
+	return nil
+}
 
-					mu.Lock()
-					defer mu.Unlock()
+func (h *Handler) handleSaveMediaGroupCaptionMessage(ctx context.Context, msg *tgbotapi.Message, metaPair models.TgMetaPair, msgText string) error {
+	const fn = "group.handleSaveMediaGroupCaptionMessage"
 
-					metaPairs = append(metaPairs, models.MetaPair{
-						Url:  metaUrl,
-						Type: pairID.Type,
-					})
-				}()
-			}
+	log := h.log.With(slog.Any("ID", ctx.Value("ID")))
 
-			wg.Wait()
+	saveMsgFunc := func() {
+		const fn = "group.saveMsgFunc"
+		resp, _ := h.ac.GetFromMap(models.MediaGroupMapName, msg.MediaGroupID)
 
-			readyMsg.Metadata = metaPairs
+		readyMsg := resp.(*models.TgGroupMessage)
 
-			msgs := []models.TgGroupMessage{*readyMsg}
+		wg := sync.WaitGroup{}
 
-			log.Debug(fn, slog.Any("media group message", *readyMsg))
+		var mu sync.Mutex
+		metaPairs := make([]models.MetaPair, 0, len(readyMsg.MetadataID))
 
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancel()
+		for _, pairID := range readyMsg.MetadataID {
+			wg.Add(1)
 
-			if err := h.db.InsertTgGroupMessages(ctx, msgs); err != nil {
-				log.Error(fn, sl.Err(err))
-			}
+			go func() {
+				defer wg.Done()
+
+				metaUrl, err := h.loadMetaByTgID(pairID.ID, loadMediaFromTgTimeout)
+				if err != nil {
+					log.Error(fn, err)
+					return
+				}
+
+				mu.Lock()
+				defer mu.Unlock()
+
+				metaPairs = append(metaPairs, models.MetaPair{
+					Url:  metaUrl,
+					Type: pairID.Type,
+				})
+			}()
 		}
 
-		resp, ok := h.ac.GetFromMap(models.MediaGroupMapName, msg.MediaGroupID)
-		if !ok {
+		wg.Wait()
 
-			metadata := []models.TgMetaPair{metaPair}
+		readyMsg.Metadata = metaPairs
 
-			message := &models.TgGroupMessage{
-				MessageID:  msg.MessageID,
-				GroupID:    msg.Chat.ID,
-				Username:   getUsername(msg.From),
-				Text:       msgText,
-				MetadataID: metadata,
-				CreatedAt:  time.Unix(int64(msg.Date), 0),
-			}
+		msgs := []models.TgGroupMessage{*readyMsg}
 
-			h.ac.SetToMapWithFunc(
-				models.MediaGroupMapName,
-				msg.MediaGroupID,
-				message,
-				mediaGroupMsgWaitingTime,
-				saveMsgFunc,
-			)
+		log.Debug(fn, slog.Any("media group message", *readyMsg))
 
-		} else {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
 
-			existingMsg := resp.(*models.TgGroupMessage)
-
-			h.ac.Mutex(models.MediaGroupMapName, func() {
-
-				existingMsg.MessageID = msg.MessageID
-				existingMsg.GroupID = msg.Chat.ID
-				existingMsg.Username = getUsername(msg.From)
-				existingMsg.Text = msgText
-				existingMsg.CreatedAt = time.Unix(int64(msg.Date), 0)
-
-				existingMsg.MetadataID = append(existingMsg.MetadataID, metaPair)
-
-			})
-
-			h.ac.SetToMapWithFunc(
-				models.MediaGroupMapName,
-				msg.MediaGroupID,
-				existingMsg,
-				mediaGroupMsgWaitingTime,
-				saveMsgFunc,
-			)
+		if err := h.db.InsertTgGroupMessages(ctx, msgs); err != nil {
+			log.Error(fn, sl.Err(err))
 		}
+	}
+
+	resp, ok := h.ac.GetFromMap(models.MediaGroupMapName, msg.MediaGroupID)
+	if !ok {
+
+		metadata := []models.TgMetaPair{metaPair}
+
+		message := &models.TgGroupMessage{
+			MessageID:  msg.MessageID,
+			GroupID:    msg.Chat.ID,
+			Username:   getUsername(msg.From),
+			Text:       msgText,
+			MetadataID: metadata,
+			CreatedAt:  time.Unix(int64(msg.Date), 0),
+		}
+
+		h.ac.SetToMapWithFunc(
+			models.MediaGroupMapName,
+			msg.MediaGroupID,
+			message,
+			mediaGroupMsgWaitingTime,
+			saveMsgFunc,
+		)
 
 	} else {
 
-		metaUrl, err := h.loadMetaByTgID(metaPair.ID, loadMediaFromTgTimeout)
-		if err != nil {
-			return e.Wrap(fn, err)
-		}
+		existingMsg := resp.(*models.TgGroupMessage)
 
-		message := models.TgGroupMessage{
-			MessageID: msg.MessageID,
-			GroupID:   msg.Chat.ID,
-			Username:  getUsername(msg.From),
-			Text:      msgText,
-			Metadata: []models.MetaPair{{
-				Url:  metaUrl,
-				Type: metaPair.Type,
-			}},
-			CreatedAt: time.Unix(int64(msg.Date), 0),
-		}
+		h.ac.Mutex(models.MediaGroupMapName, func() {
 
-		msgs := []models.TgGroupMessage{message}
+			existingMsg.MessageID = msg.MessageID
+			existingMsg.GroupID = msg.Chat.ID
+			existingMsg.Username = getUsername(msg.From)
+			existingMsg.Text = msgText
+			existingMsg.CreatedAt = time.Unix(int64(msg.Date), 0)
 
-		if err := h.db.InsertTgGroupMessages(ctx, msgs); err != nil {
-			return e.Wrap(fn, err)
-		}
+			existingMsg.MetadataID = append(existingMsg.MetadataID, metaPair)
+
+		})
+
+		h.ac.SetToMapWithFunc(
+			models.MediaGroupMapName,
+			msg.MediaGroupID,
+			existingMsg,
+			mediaGroupMsgWaitingTime,
+			saveMsgFunc,
+		)
 	}
 
 	return nil
@@ -702,6 +721,21 @@ func getUsername(user *tgbotapi.User) string {
 	}
 
 	return res
+}
+
+func (h *Handler) sendMsg(chatID int64, text string) error {
+	const fn = "group.sendMsg"
+
+	var msg tgbotapi.MessageConfig
+
+	msg = tgbotapi.NewMessage(chatID, text)
+
+	_, err := h.tg.Send(msg)
+	if err != nil {
+		return e.Wrap(fn, err)
+	}
+
+	return nil
 }
 
 func (h *Handler) getRole(ctx context.Context, userID int64) (role string, err error) {

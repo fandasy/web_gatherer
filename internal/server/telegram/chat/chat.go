@@ -226,7 +226,7 @@ func (h *Handler) getPermission(ctx context.Context, msg *tgbotapi.Message) erro
 
 	h.ac.DeleteFromMap(secretCodeMap, msg.From.UserName)
 
-	if err := h.sendReplyTgMsg(msg, msgSuccessfullyAddUser); err != nil {
+	if err := h.sendReplyTgMsg(msg, msgSuccessfullyGetPermission); err != nil {
 		log.Error(fn, err)
 	}
 
@@ -505,7 +505,7 @@ func (h *Handler) addUser(ctx context.Context, msg *tgbotapi.Message) error {
 
 	secretCode := getSecretCode()
 
-	h.ac.SetToMap(secretCodeMap, username, secretCode, 0)
+	h.ac.SetToMap(secretCodeMap, username, secretCode, 3*time.Hour)
 
 	if err := h.sendReplyTgMsg(msg, fmt.Sprintf(msgSuccessfullyAddUser, secretCode)); err != nil {
 		log.Error(fn, err)
