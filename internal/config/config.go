@@ -21,6 +21,7 @@ type Config struct {
 }
 
 type Telegram struct {
+	Admin   string `yaml:"admin"`
 	Host    string `yaml:"host"`
 	Token   string `yaml:"token"`
 	Timeout int    `yaml:"update_timeout"`

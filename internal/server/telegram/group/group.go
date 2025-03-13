@@ -108,7 +108,7 @@ func (h *Handler) leftChatMember(ctx context.Context, msg *tgbotapi.Message) err
 }
 
 func (h *Handler) updateGroupToSupergroup(ctx context.Context, msg *tgbotapi.Message) error {
-	const fn = "events.updateGroupToSupergroup"
+	const fn = "group.updateGroupToSupergroup"
 
 	h.log.Info("[TG SUPERGROUP]",
 		slog.String("fn", fn),
@@ -141,7 +141,7 @@ func (h *Handler) updateGroupToSupergroup(ctx context.Context, msg *tgbotapi.Mes
 }
 
 func (h *Handler) initNewGroup(ctx context.Context, msg *tgbotapi.Message) (err error) {
-	const fn = "events.initNewGroup"
+	const fn = "group.initNewGroup"
 
 	h.log.Info("[TG GROUP]",
 		slog.String("fn", fn),
@@ -197,7 +197,7 @@ func (h *Handler) initNewGroup(ctx context.Context, msg *tgbotapi.Message) (err 
 }
 
 func (h *Handler) newGroupTitle(ctx context.Context, msg *tgbotapi.Message) error {
-	const fn = "events.newGroupTitle"
+	const fn = "group.newGroupTitle"
 
 	h.log.Info("[TG GROUP]",
 		slog.String("fn", fn),
@@ -227,7 +227,7 @@ func (h *Handler) newGroupTitle(ctx context.Context, msg *tgbotapi.Message) erro
 }
 
 func (h *Handler) leaveChat(ctx context.Context, cmu *tgbotapi.ChatMemberUpdated) error {
-	const fn = "events.leaveChat"
+	const fn = "group.leaveChat"
 
 	h.log.Info("[TG GROUP]",
 		slog.String("fn", fn),
@@ -257,7 +257,7 @@ func (h *Handler) leaveChat(ctx context.Context, cmu *tgbotapi.ChatMemberUpdated
 }
 
 func (h *Handler) saveMsg(ctx context.Context, msg *tgbotapi.Message) error {
-	const fn = "events.saveMsg"
+	const fn = "group.saveMsg"
 
 	h.log.Info("[TG GROUP]",
 		slog.String("fn", fn),
@@ -306,7 +306,7 @@ func (h *Handler) saveMsg(ctx context.Context, msg *tgbotapi.Message) error {
 }
 
 func (h *Handler) handleSaveTextMessage(ctx context.Context, msg *tgbotapi.Message) error {
-	const fn = "events.handleSaveTextMessage"
+	const fn = "group.handleSaveTextMessage"
 
 	log := h.log.With(slog.Any("ID", ctx.Value("ID")))
 
@@ -344,7 +344,7 @@ const (
 )
 
 func (h *Handler) handleSaveCaptionMessage(ctx context.Context, msg *tgbotapi.Message) error {
-	const fn = "events.handleSaveCaptionMessage"
+	const fn = "group.handleSaveCaptionMessage"
 
 	log := h.log.With(slog.Any("ID", ctx.Value("ID")))
 
@@ -498,7 +498,7 @@ func (h *Handler) handleSaveCaptionMessage(ctx context.Context, msg *tgbotapi.Me
 }
 
 func (h *Handler) handleSaveMessageMedia(ctx context.Context, msg *tgbotapi.Message) error {
-	const fn = "events.handleSaveMessageMedia"
+	const fn = "group.handleSaveMessageMedia"
 
 	log := h.log.With(slog.Any("ID", ctx.Value("ID")))
 
@@ -615,7 +615,7 @@ func isNewsMessage(text string) bool {
 const mediaBucket = models.MediaBucket
 
 func (h *Handler) loadMetaByTgID(fileID string, timeout time.Duration) (string, error) {
-	const fn = "web-socket.loadMetaByTgID"
+	const fn = "group.loadMetaByTgID"
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -705,7 +705,7 @@ func getUsername(user *tgbotapi.User) string {
 }
 
 func (h *Handler) getRole(ctx context.Context, userID int64) (role string, err error) {
-	const fn = "chat.getRole"
+	const fn = "group.getRole"
 
 	if userID == h.tg.Self.ID {
 		return models.AdminRole, nil

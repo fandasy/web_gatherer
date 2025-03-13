@@ -6,6 +6,11 @@ import (
 	"project/internal/clients/tg_bot"
 	"project/internal/clients/vk"
 	"project/internal/models"
+	"time"
+)
+
+const (
+	secretCodeMap = models.GetPermissionSecretCodeMapName
 )
 
 type Handler struct {
@@ -24,6 +29,7 @@ type Storage interface {
 	InsertUsers(ctx context.Context, users []models.User) error
 	DeleteUser(ctx context.Context, userID int64) error
 	GetUserRole(ctx context.Context, userID int64) (string, error)
+	GetUserWithUsername(ctx context.Context, username string) (models.User, error)
 }
 
 type Cache interface {
@@ -33,7 +39,9 @@ type Cache interface {
 }
 
 type AppCache interface {
+	SetToMap(name, key string, value any, TTL time.Duration) bool
 	GetFromMap(name string, key string) (any, bool)
+	DeleteFromMap(name, key string)
 }
 
 func NewHandler(tg *tg_bot.Client, vk *vk.Handler, db Storage, cdb Cache, ac AppCache, log *slog.Logger) *Handler {

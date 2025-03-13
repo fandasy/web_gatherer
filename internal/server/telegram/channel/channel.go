@@ -43,13 +43,13 @@ func (h *Handler) ChannelCmd(ctx context.Context, update *tgbotapi.Update) error
 }
 
 func (h *Handler) initNewChannel(ctx context.Context, cmu *tgbotapi.ChatMemberUpdated) (err error) {
-	const fn = "events.initNewChannel"
+	const fn = "channel.initNewChannel"
 
 	h.log.Info("[TG CHANNEL]",
 		slog.String("fn", fn),
 		slog.Any("ID", ctx.Value("ID")),
 		slog.String("username", cmu.From.UserName),
-		slog.String("group", cmu.Chat.Title),
+		slog.String("channel", cmu.Chat.Title),
 	)
 
 	log := slog.With(
@@ -99,7 +99,7 @@ func (h *Handler) initNewChannel(ctx context.Context, cmu *tgbotapi.ChatMemberUp
 }
 
 func (h *Handler) leaveChannel(ctx context.Context, cmu *tgbotapi.ChatMemberUpdated) error {
-	const fn = "events.leaveChannel"
+	const fn = "channel.leaveChannel"
 
 	h.log.Info("[TG CHANNEL]",
 		slog.String("fn", fn),
@@ -129,12 +129,12 @@ func (h *Handler) leaveChannel(ctx context.Context, cmu *tgbotapi.ChatMemberUpda
 }
 
 func (h *Handler) saveMsg(ctx context.Context, msg *tgbotapi.Message) error {
-	const fn = "events.saveMsg"
+	const fn = "channel.saveMsg"
 
 	h.log.Info("[TG CHANNEL]",
 		slog.String("fn", fn),
 		slog.Any("ID", ctx.Value("ID")),
-		slog.String("group", msg.Chat.Title),
+		slog.String("channel", msg.Chat.Title),
 	)
 
 	log := h.log.With(
@@ -177,7 +177,7 @@ func (h *Handler) saveMsg(ctx context.Context, msg *tgbotapi.Message) error {
 }
 
 func (h *Handler) handleSaveTextMessage(ctx context.Context, msg *tgbotapi.Message) error {
-	const fn = "events.handleSaveTextMessage"
+	const fn = "channel.handleSaveTextMessage"
 
 	var msgText = msg.Text
 
@@ -205,7 +205,7 @@ const (
 )
 
 func (h *Handler) handleSaveCaptionMessage(ctx context.Context, msg *tgbotapi.Message) error {
-	const fn = "events.handleSaveCaptionMessage"
+	const fn = "channel.handleSaveCaptionMessage"
 
 	log := h.log.With(slog.Any("ID", ctx.Value("ID")))
 
@@ -349,7 +349,7 @@ func (h *Handler) handleSaveCaptionMessage(ctx context.Context, msg *tgbotapi.Me
 }
 
 func (h *Handler) handleSaveMessageMedia(ctx context.Context, msg *tgbotapi.Message) error {
-	const fn = "events.handleSaveMessageMedia"
+	const fn = "channel.handleSaveMessageMedia"
 
 	log := h.log.With(slog.Any("ID", ctx.Value("ID")))
 
@@ -434,7 +434,7 @@ func getMetadataFromTgMsg(msg *tgbotapi.Message) models.TgMetaPair {
 const mediaBucket = models.MediaBucket
 
 func (h *Handler) loadMetaByTgID(fileID string, timeout time.Duration) (string, error) {
-	const fn = "web-socket.loadMetaByTgID"
+	const fn = "channel.loadMetaByTgID"
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -510,7 +510,7 @@ func defineRole(role string, roles ...string) bool {
 }
 
 func (h *Handler) getRole(ctx context.Context, userID int64) (role string, err error) {
-	const fn = "chat.getRole"
+	const fn = "channel.getRole"
 
 	if userID == h.tg.Self.ID {
 		return models.AdminRole, nil

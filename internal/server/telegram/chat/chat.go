@@ -6,6 +6,7 @@ import (
 	"fmt"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"log/slog"
+	"math/rand"
 	"project/internal/clients/vk"
 	"project/internal/models"
 	"project/internal/pkg/logger/sl"
@@ -14,6 +15,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 )
 
 const (
@@ -26,6 +28,8 @@ const (
 	getTgChannel     = "/get tg ch"
 	getTgGroup       = "/get tg group"
 	getVkGroup       = "/get vk"
+
+	permissionCmd = "/perm "
 
 	addVkGroupCmd     = "/add vk "
 	deleteVkGroupCmd  = "/delete vk "
@@ -42,6 +46,11 @@ var (
 func (h *Handler) ChatCmd(ctx context.Context, update *tgbotapi.Update) error {
 
 	if update.Message != nil {
+
+		if strings.HasPrefix(update.Message.Text, permissionCmd) {
+
+		}
+
 		role, err := h.getRole(ctx, update.Message.From.ID)
 		if err != nil {
 			switch {
@@ -99,7 +108,7 @@ func (h *Handler) ChatCmd(ctx context.Context, update *tgbotapi.Update) error {
 }
 
 func (h *Handler) startCmd(ctx context.Context, msgInfo *tgbotapi.Message) error {
-	const fn = "events.startCmd"
+	const fn = "chat.startCmd"
 
 	h.log.Info("[CHAT]",
 		slog.String("fn", fn),
@@ -131,7 +140,7 @@ func (h *Handler) startCmd(ctx context.Context, msgInfo *tgbotapi.Message) error
 }
 
 func (h *Handler) helpCmd(ctx context.Context, msgInfo *tgbotapi.Message) error {
-	const fn = "events.helpCmd"
+	const fn = "chat.helpCmd"
 
 	h.log.Info("[CHAT]",
 		slog.String("fn", fn),
@@ -160,8 +169,79 @@ func (h *Handler) helpCmd(ctx context.Context, msgInfo *tgbotapi.Message) error 
 	return nil
 }
 
+func (h *Handler) getPermission(ctx context.Context, msg *tgbotapi.Message) error {
+	const fn = "chat.getPermission"
+
+	h.log.Info("[CHAT]",
+		slog.String("fn", fn),
+		slog.Any("ID", ctx.Value("ID")),
+		slog.String("username", msg.From.UserName),
+		slog.String("cmd", msg.Text),
+	)
+
+	log := h.log.With(slog.Any("ID", ctx.Value("ID")))
+
+	secretCode := strings.TrimPrefix(msg.Text, permissionCmd)
+
+	correctCode, ok := h.ac.GetFromMap(secretCodeMap, msg.From.UserName)
+	if !ok {
+		if err := h.sendReplyTgMsg(msg, msgIncorrectArgs); err != nil {
+			log.Error(fn, err)
+		}
+
+		log.Warn("Bad request", sl.Err(ErrUserNotFound))
+
+		return e.Wrap(fn, models.ErrBadRequest)
+	}
+
+	if correctCode != secretCode {
+		if err := h.sendReplyTgMsg(msg, msgIncorrectArgs); err != nil {
+			log.Error(fn, err)
+		}
+
+		log.Warn("Bad request", sl.Err(ErrIncorrectArgs))
+
+		return e.Wrap(fn, models.ErrBadRequest)
+	}
+
+	log.Debug("Correct code received", slog.String("Username", msg.From.UserName))
+
+	roleID, _ := h.ac.GetFromMap(models.RoleIDsMapName, models.SubUserRole)
+
+	from := msg.From
+
+	users := []models.User{
+		{
+			UserID:    from.ID,
+			Username:  from.UserName,
+			FirstName: from.FirstName,
+			LastName:  from.LastName,
+			RoleID:    roleID.(int64),
+		},
+	}
+
+	if err := h.db.InsertUsers(ctx, users); err != nil {
+		return e.Wrap(fn, err)
+	}
+
+	h.ac.DeleteFromMap(secretCodeMap, msg.From.UserName)
+
+	if err := h.sendReplyTgMsg(msg, msgSuccessfullyAddUser); err != nil {
+		log.Error(fn, err)
+	}
+
+	if err := h.cdb.Set(ctx, strconv.FormatInt(from.ID, 10), models.SubUserRole); err != nil {
+		log.Warn("Cache error",
+			slog.String("fn", fn),
+			sl.Err(err),
+		)
+	}
+
+	return nil
+}
+
 func (h *Handler) getNewsSources(ctx context.Context, msg *tgbotapi.Message) error {
-	const fn = "events.getNewsSources"
+	const fn = "chat.getNewsSources"
 
 	h.log.Info("[CHAT]",
 		slog.String("fn", fn),
@@ -294,7 +374,7 @@ func (h *Handler) getNewsSources(ctx context.Context, msg *tgbotapi.Message) err
 }
 
 func (h *Handler) addVkGroup(ctx context.Context, msg *tgbotapi.Message) error {
-	const fn = "events.addVkGroup"
+	const fn = "chat.addVkGroup"
 
 	h.log.Info("[CHAT]",
 		slog.String("fn", fn),
@@ -353,7 +433,7 @@ func (h *Handler) addVkGroup(ctx context.Context, msg *tgbotapi.Message) error {
 }
 
 func (h *Handler) deleteNewsVkGroup(ctx context.Context, msg *tgbotapi.Message) error {
-	const fn = "events.deleteNewsVkGroup"
+	const fn = "chat.deleteNewsVkGroup"
 
 	h.log.Info("[CHAT]",
 		slog.String("fn", fn),
@@ -392,7 +472,7 @@ func (h *Handler) deleteNewsVkGroup(ctx context.Context, msg *tgbotapi.Message) 
 }
 
 func (h *Handler) addUser(ctx context.Context, msg *tgbotapi.Message) error {
-	const fn = "events.addUser"
+	const fn = "chat.addUser"
 
 	h.log.Info("[CHAT]",
 		slog.String("fn", fn),
@@ -423,55 +503,19 @@ func (h *Handler) addUser(ctx context.Context, msg *tgbotapi.Message) error {
 
 	username := args[1]
 
-	chat, err := h.tg.GetChat(tgbotapi.ChatInfoConfig{
-		ChatConfig: tgbotapi.ChatConfig{
-			SuperGroupUsername: username,
-		},
-	})
-	if err != nil {
-		return e.Wrap(fn, err)
-	}
+	secretCode := getSecretCode()
 
-	log.Debug("GetChat result",
-		slog.Int64("user id", chat.ID),
-	)
+	h.ac.SetToMap(secretCodeMap, username, secretCode, 0)
 
-	roleID, _ := h.ac.GetFromMap(models.RoleIDsMapName, models.SubUserRole)
-
-	users := []models.User{
-		{
-			UserID:    chat.ID,
-			Username:  chat.UserName,
-			FirstName: chat.FirstName,
-			LastName:  chat.LastName,
-			RoleID:    roleID.(int64),
-		},
-	}
-
-	log.Debug("Get TgUsers Info",
-		slog.Any("user", users[0]),
-	)
-
-	if err := h.db.InsertUsers(ctx, users); err != nil {
-		return e.Wrap(fn, err)
-	}
-
-	if err := h.sendReplyTgMsg(msg, msgSuccessfullyAddUser); err != nil {
+	if err := h.sendReplyTgMsg(msg, fmt.Sprintf(msgSuccessfullyAddUser, secretCode)); err != nil {
 		log.Error(fn, err)
-	}
-
-	if err := h.cdb.Set(ctx, strconv.FormatInt(chat.ID, 10), models.SubUserRole); err != nil {
-		log.Warn("Cache error",
-			slog.String("fn", fn),
-			sl.Err(err),
-		)
 	}
 
 	return nil
 }
 
 func (h *Handler) deleteUser(ctx context.Context, msg *tgbotapi.Message) error {
-	const fn = "events.deleteUser"
+	const fn = "chat.deleteUser"
 
 	h.log.Info("[CHAT]",
 		slog.String("fn", fn),
@@ -502,20 +546,7 @@ func (h *Handler) deleteUser(ctx context.Context, msg *tgbotapi.Message) error {
 
 	username := args[1]
 
-	chat, err := h.tg.GetChat(tgbotapi.ChatInfoConfig{
-		ChatConfig: tgbotapi.ChatConfig{
-			SuperGroupUsername: username,
-		},
-	})
-	if err != nil {
-		return e.Wrap(fn, err)
-	}
-
-	log.Debug("GetChat result",
-		slog.Int64("user id", chat.ID),
-	)
-
-	userRole, err := h.getRole(ctx, chat.ID)
+	user, err := h.db.GetUserWithUsername(ctx, username)
 	if err != nil {
 		if errors.Is(err, storage.ErrNoRecordsFound) {
 			if err := h.sendReplyTgMsg(msg, msgUserNotFound); err != nil {
@@ -530,6 +561,11 @@ func (h *Handler) deleteUser(ctx context.Context, msg *tgbotapi.Message) error {
 		return e.Wrap(fn, err)
 	}
 
+	userRole, err := h.getRole(ctx, user.UserID)
+	if err != nil {
+		return e.Wrap(fn, err)
+	}
+
 	if defineRole(userRole, models.AdminRole) {
 		if err := h.sendReplyTgMsg(msg, msgIncorrectArgs); err != nil {
 			log.Error(fn, err)
@@ -540,7 +576,7 @@ func (h *Handler) deleteUser(ctx context.Context, msg *tgbotapi.Message) error {
 		return e.Wrap(fn, models.ErrBadRequest)
 	}
 
-	if err := h.db.DeleteUser(ctx, chat.ID); err != nil {
+	if err := h.db.DeleteUser(ctx, user.UserID); err != nil {
 		return e.Wrap(fn, err)
 	}
 
@@ -548,7 +584,7 @@ func (h *Handler) deleteUser(ctx context.Context, msg *tgbotapi.Message) error {
 		log.Error(fn, err)
 	}
 
-	if err := h.cdb.Del(ctx, strconv.FormatInt(chat.ID, 10)); err != nil {
+	if err := h.cdb.Del(ctx, strconv.FormatInt(user.UserID, 10)); err != nil {
 		log.Warn("Cache error",
 			slog.String("fn", fn),
 			sl.Err(err),
@@ -559,7 +595,7 @@ func (h *Handler) deleteUser(ctx context.Context, msg *tgbotapi.Message) error {
 }
 
 func (h *Handler) sendReplyTgMsg(msgInfo *tgbotapi.Message, text string) error {
-	const fn = "events.sendReplyTgMsg"
+	const fn = "chat.sendReplyTgMsg"
 
 	var msg tgbotapi.MessageConfig
 
@@ -616,4 +652,18 @@ getFromDb:
 	}
 
 	return role, nil
+}
+
+func getSecretCode() string {
+	charset := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	keyLength := 10
+
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+
+	shortKey := make([]byte, keyLength)
+	for i := range shortKey {
+		shortKey[i] = charset[r.Intn(len(charset)-1)]
+	}
+
+	return string(shortKey)
 }

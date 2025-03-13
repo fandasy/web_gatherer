@@ -7,18 +7,48 @@ import (
 	"math/rand"
 	"os"
 	"os/signal"
+	"project/internal/models"
 	"project/internal/pkg/logger/sl"
 	"strconv"
 	"syscall"
 	"time"
 )
 
-func (s *Server) Listener(timeout int) {
+func (s *Server) Prepare(ctx context.Context, timeout int, admin string) (tgbotapi.UpdatesChannel, error) {
 	cfg := tgbotapi.NewUpdate(0)
 	cfg.Timeout = timeout
 
 	updates := s.tg.GetUpdatesChan(cfg)
 
+	var user models.User
+
+	s.log.Info("[TELEGRAM] Write to your chat bot on behalf of Admin, which was specified in the config file")
+
+	for update := range updates {
+		if update.Message != nil {
+			if update.Message.From != nil && update.Message.From.UserName == admin {
+
+				from := update.Message.From
+				user = models.User{
+					UserID:    from.ID,
+					Username:  from.UserName,
+					FirstName: from.FirstName,
+					LastName:  from.LastName,
+				}
+				break
+
+			}
+		}
+	}
+
+	if err := s.p.sup.SaveAdminUser(ctx, user); err != nil {
+		return nil, err
+	}
+
+	return updates, nil
+}
+
+func (s *Server) Listener(updates tgbotapi.UpdatesChannel) {
 	s.log.Info("Telegram server started")
 
 	for update := range updates {

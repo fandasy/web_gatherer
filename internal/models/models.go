@@ -6,8 +6,9 @@ import (
 )
 
 const (
-	RoleIDsMapName    = "RoleIDs"
-	MediaGroupMapName = "mediaGroupIDs"
+	RoleIDsMapName                 = "RoleIDs"
+	MediaGroupMapName              = "mediaGroupIDs"
+	GetPermissionSecretCodeMapName = "GetPermissionSecretCodeMapName"
 
 	SubUserRole = "sub user"
 	AdminRole   = "admin"

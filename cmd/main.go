@@ -16,6 +16,7 @@ import (
 	"project/internal/server/telegram/channel"
 	"project/internal/server/telegram/chat"
 	"project/internal/server/telegram/group"
+	"project/internal/server/telegram/sup"
 	"project/internal/server/web"
 	"project/internal/storage/psql"
 	"syscall"
@@ -76,11 +77,17 @@ func main() {
 		chat.NewHandler(tgBot, vkHandler, storage, cache, appCache, log),
 		group.NewHandler(tgBot, storage, cache, appCache, files, log),
 		channel.NewHandler(tgBot, storage, cache, appCache, files, log),
+		sup.NewHandler(storage, cache, appCache),
 	)
 
 	tgSrv := telegram.NewServer(tgBot, processor, log)
 
-	go tgSrv.Listener(cfg.Telegram.Timeout)
+	updatesCh, err := tgSrv.Prepare(context.TODO(), cfg.Telegram.Timeout, cfg.Telegram.Admin)
+	if err != nil {
+		panic(err)
+	}
+
+	go tgSrv.Listener(updatesCh)
 
 	// Web UI server
 	handlers := web.NewHandler(storage, log)

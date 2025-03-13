@@ -1,7 +1,11 @@
 package chat
 
 const (
-	msgSuccessfullyAddUser           = `Пользователь успешно добавлен`
+	msgSuccessfullyAddUser = `Передайте пользователю секретный код для получения прав доступа
+Code: %s
+
+Комманда для получения прав: /perm <code>`
+	msgSuccessfullyGetPermission     = `Вам успешно предоставлены права доступа`
 	msgSuccessfullyDeleteUser        = `Пользователь успешно удалён`
 	msgSuccessfullyAddVKNewsGroup    = `VK группа успешна добавлена`
 	msgSuccessfullyDeleteVkNewsGroup = `VK группа успешна удалена`

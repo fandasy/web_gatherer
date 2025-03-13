@@ -17,7 +17,7 @@ type Files struct {
 func New(ctx context.Context, cfg *config.Files, log *slog.Logger) (*Files, error) {
 	const fn = "minio.New"
 
-	minioClient, err := minio.New(cfg.LocalAddr, &minio.Options{
+	minioClient, err := minio.New(cfg.Addr, &minio.Options{
 		Creds:  credentials.NewStaticV4(cfg.KeyID, cfg.Secret, ""),
 		Secure: false,
 	})

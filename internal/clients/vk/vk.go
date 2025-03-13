@@ -74,9 +74,9 @@ func (h *Handler) Shutdown(ctx context.Context, domain string) error {
 		if err := h.db.DeleteVkGroup(ctx, domain); err != nil {
 			return e.Wrap(fn, err)
 		}
+		h.log.Info("[VK GROUP] Listener shutting down", slog.String("domain", domain))
 		delete(h.ls.m, domain)
 		close(listener.stop)
-		h.log.Info("[VK GROUP] Listener shutting down", slog.String("domain", domain))
 	default:
 	}
 
@@ -146,27 +146,18 @@ func (h *Handler) listen(vkGroup models.VkGroup, stopCh chan struct{}) {
 	timer := time.NewTimer(time.Nanosecond)
 
 	pollIntervalBase := minInterval
-	var maxIntervalUse bool
 
 	nextPollInterval := func(postsReceived bool) time.Duration {
 		if postsReceived {
-			pollIntervalBase = minInterval
+			pollIntervalBase = maxInterval
 
 			return pollIntervalBase
 
 		} else {
-			pollIntervalBase *= 2
+			pollIntervalBase -= pollIntervalBase / 3
 
-			if pollIntervalBase > maxInterval {
-				if maxIntervalUse {
-					pollIntervalBase = maxInterval / 2
-					maxIntervalUse = false
-
-				} else {
-					pollIntervalBase = maxInterval
-					maxIntervalUse = true
-				}
-
+			if pollIntervalBase < minInterval {
+				pollIntervalBase = minInterval
 			}
 
 			return pollIntervalBase + time.Duration(rand.Intn(int(pollIntervalBase/10)))
@@ -178,6 +169,7 @@ func (h *Handler) listen(vkGroup models.VkGroup, stopCh chan struct{}) {
 	for {
 		select {
 		case <-stopCh:
+			h.log.Info("[VK GROUP] Listener shutdown")
 			return
 		case <-timer.C:
 		}

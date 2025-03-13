@@ -40,8 +40,11 @@ var (
 
 func New(api *api.VK, db Storage, log *slog.Logger) *Handler {
 	return &Handler{
-		vk:  api,
-		db:  db,
+		vk: api,
+		db: db,
+		ls: &listeners{
+			m: make(map[string]*Listener),
+		},
 		log: log,
 	}
 }

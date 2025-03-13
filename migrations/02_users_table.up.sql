@@ -7,7 +7,3 @@ CREATE TABLE IF NOT EXISTS users
     role_id     INTEGER     NOT NULL,
     FOREIGN KEY (role_id)   REFERENCES roles (id)   ON DELETE CASCADE
 );
-
-INSERT INTO users (id, username, role_id) VALUES
-(5222179967, 'Her72hbf', 2);
-

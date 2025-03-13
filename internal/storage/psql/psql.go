@@ -106,6 +106,28 @@ func (s *Storage) GetUserRole(ctx context.Context, userID int64) (string, error)
 	return role, nil
 }
 
+func (s *Storage) GetUserWithUsername(ctx context.Context, username string) (models.User, error) {
+	const fn = "psql.GetUserWithUsername"
+
+	q := `
+	SELECT *
+    FROM users
+    WHERE username = $1`
+
+	var u models.User
+
+	err := s.db.QueryRowContext(ctx, q, username).Scan(&u.UserID, &u.Username, &u.FirstName, &u.LastName, &u.RoleID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return models.User{}, storage.ErrNoRecordsFound
+		}
+
+		return models.User{}, e.Wrap(fn, err)
+	}
+
+	return u, nil
+}
+
 // InsertUsers If the user already exists, the role will not change
 func (s *Storage) InsertUsers(ctx context.Context, users []models.User) error {
 	const fn = "psql.InsertUsers"

@@ -6,6 +6,7 @@ import (
 	"project/internal/server/telegram/channel"
 	"project/internal/server/telegram/chat"
 	"project/internal/server/telegram/group"
+	"project/internal/server/telegram/sup"
 	"sync/atomic"
 )
 
@@ -21,6 +22,7 @@ type Processor struct {
 	chat    *chat.Handler
 	group   *group.Handler
 	channel *channel.Handler
+	sup     *sup.Handler
 }
 
 func NewServer(tg *tg_bot.Client, p Processor, log *slog.Logger) *Server {
@@ -33,10 +35,11 @@ func NewServer(tg *tg_bot.Client, p Processor, log *slog.Logger) *Server {
 	}
 }
 
-func NewProcessor(chat *chat.Handler, group *group.Handler, channel *channel.Handler) Processor {
+func NewProcessor(chat *chat.Handler, group *group.Handler, channel *channel.Handler, sup *sup.Handler) Processor {
 	return Processor{
 		chat:    chat,
 		group:   group,
 		channel: channel,
+		sup:     sup,
 	}
 }

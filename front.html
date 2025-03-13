@@ -99,7 +99,7 @@
 <button id="getMoreMessages">Получить ещё</button>
 
 <script>
-    const socket = new WebSocket('http://mytestdomain.ddns.net:8082/ws'); // Замените на ваш адрес http server
+    const socket = new WebSocket('http://192.168.0.102:8082/ws'); // Замените на ваш адрес http server
 
     socket.onopen = function (event) {
         console.log('Подключение к WebSocket установлено.');

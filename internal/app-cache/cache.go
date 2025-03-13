@@ -15,31 +15,43 @@ func (m *MapManager) CreateMap(name string) {
 }
 
 func (m *MapManager) DeleteFromMap(name, key string) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	m.mu.RLock()
 
-	if _, exists := m.maps[name]; exists {
-		delete(m.maps[name].m, key)
+	if exMap, exists := m.maps[name]; exists {
+		m.mu.RUnlock()
+
+		exMap.mu.Lock()
+		defer exMap.mu.Unlock()
+
+		delete(exMap.m, key)
+
+		return
 	}
+
+	m.mu.RUnlock()
 }
 
 func (m *MapManager) SetToMap(name, key string, value any, TTL time.Duration) bool {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	m.mu.RLock()
 
-	if _, exists := m.maps[name]; exists {
+	if existingMap, exists := m.maps[name]; exists {
+		m.mu.RUnlock()
+
+		existingMap.mu.Lock()
+		defer existingMap.mu.Unlock()
+
 		if TTL <= 0 {
-			m.maps[name].m[key] = valueWithTimer{
+			existingMap.m[key] = valueWithTimer{
 				value: value,
 				timer: nil,
 			}
 
 		} else {
-			if existingValue, exists := m.maps[name].m[key]; exists && existingValue.timer != nil {
+			if existingValue, exists := existingMap.m[key]; exists && existingValue.timer != nil {
 
 				existingValue.timer.Reset(TTL)
 
-				m.maps[name].m[key] = valueWithTimer{
+				existingMap.m[key] = valueWithTimer{
 					value: value,
 					timer: existingValue.timer,
 				}
@@ -49,7 +61,7 @@ func (m *MapManager) SetToMap(name, key string, value any, TTL time.Duration) bo
 					m.DeleteFromMap(name, key)
 				})
 
-				m.maps[name].m[key] = valueWithTimer{
+				existingMap.m[key] = valueWithTimer{
 					value: value,
 					timer: timer,
 				}
@@ -59,23 +71,29 @@ func (m *MapManager) SetToMap(name, key string, value any, TTL time.Duration) bo
 		return true
 
 	} else {
+		m.mu.RUnlock()
+
 		return false
 	}
 }
 
 func (m *MapManager) SetToMapWithFunc(name, key string, value any, TTL time.Duration, fn func()) bool {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	m.mu.RLock()
 
-	if _, exists := m.maps[name]; exists {
+	if existingMap, exists := m.maps[name]; exists {
+		m.mu.RUnlock()
+
+		existingMap.mu.Lock()
+		defer existingMap.mu.Unlock()
+
 		if TTL <= 0 {
-			m.maps[name].m[key] = valueWithTimer{
+			existingMap.m[key] = valueWithTimer{
 				value: value,
 				timer: nil,
 			}
 
 		} else {
-			if existingValue, exists := m.maps[name].m[key]; exists && existingValue.timer != nil {
+			if existingValue, exists := existingMap.m[key]; exists && existingValue.timer != nil {
 
 				if fn != nil {
 					existingValue.timer.Stop()
@@ -85,7 +103,7 @@ func (m *MapManager) SetToMapWithFunc(name, key string, value any, TTL time.Dura
 						m.DeleteFromMap(name, key)
 					})
 
-					m.maps[name].m[key] = valueWithTimer{
+					existingMap.m[key] = valueWithTimer{
 						value: value,
 						timer: timer,
 					}
@@ -93,7 +111,7 @@ func (m *MapManager) SetToMapWithFunc(name, key string, value any, TTL time.Dura
 				} else {
 					existingValue.timer.Reset(TTL)
 
-					m.maps[name].m[key] = valueWithTimer{
+					existingMap.m[key] = valueWithTimer{
 						value: value,
 						timer: existingValue.timer,
 					}
@@ -109,7 +127,7 @@ func (m *MapManager) SetToMapWithFunc(name, key string, value any, TTL time.Dura
 					m.DeleteFromMap(name, key)
 				})
 
-				m.maps[name].m[key] = valueWithTimer{
+				existingMap.m[key] = valueWithTimer{
 					value: value,
 					timer: timer,
 				}
@@ -119,19 +137,29 @@ func (m *MapManager) SetToMapWithFunc(name, key string, value any, TTL time.Dura
 		return true
 
 	} else {
+		m.mu.RUnlock()
+
 		return false
 	}
 }
 
 func (m *MapManager) GetFromMap(name, key string) (any, bool) {
 	m.mu.RLock()
-	defer m.mu.RUnlock()
 
-	if _, exists := m.maps[name]; exists {
-		if val, exists := m.maps[name].m[key]; exists {
+	if exMap, exists := m.maps[name]; exists {
+		m.mu.RUnlock()
+
+		exMap.mu.RLock()
+		defer exMap.mu.RUnlock()
+
+		if val, exists := exMap.m[key]; exists {
 			return val.value, true
 		}
+
+		return nil, false
 	}
+
+	m.mu.RUnlock()
 
 	return nil, false
 }
@@ -142,27 +170,47 @@ const (
 )
 
 func (m *MapManager) Mutex(name string, fn func()) {
-	m.maps[name].mu.Lock()
+	m.mu.RLock()
 
-	timer := time.AfterFunc(mutexLockTime, func() {
-		m.maps[name].mu.Unlock()
-	})
+	if exMap, exists := m.maps[name]; exists {
+		m.mu.RUnlock()
 
-	fn()
-	if timer.Stop() {
-		m.maps[name].mu.Unlock()
+		exMap.mu.Lock()
+
+		timer := time.AfterFunc(mutexLockTime, func() {
+			exMap.mu.Unlock()
+		})
+
+		fn()
+		if timer.Stop() {
+			exMap.mu.Unlock()
+		}
+
+		return
 	}
+
+	m.mu.RUnlock()
 }
 
 func (m *MapManager) RWMutex(name string, fn func()) {
-	m.maps[name].mu.RLock()
+	m.mu.RLock()
 
-	timer := time.AfterFunc(rwmutexLockTime, func() {
-		m.maps[name].mu.RUnlock()
-	})
+	if exMap, exists := m.maps[name]; exists {
+		m.mu.RUnlock()
 
-	fn()
-	if timer.Stop() {
-		m.maps[name].mu.RUnlock()
+		exMap.mu.RLock()
+
+		timer := time.AfterFunc(rwmutexLockTime, func() {
+			exMap.mu.RUnlock()
+		})
+
+		fn()
+		if timer.Stop() {
+			exMap.mu.RUnlock()
+		}
+
+		return
 	}
+
+	m.mu.RUnlock()
 }

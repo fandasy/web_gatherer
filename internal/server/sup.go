@@ -7,12 +7,6 @@ import (
 	"time"
 )
 
-type SubHandler struct {
-	vk *vk.Handler
-	db Storage
-	ac AppCache
-}
-
 type Storage interface {
 	GetRoleIDs(ctx context.Context) ([]models.Role, error)
 }
